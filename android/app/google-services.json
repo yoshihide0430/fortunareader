@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "246209323355",
+    "project_id": "fortunareader-prod",
+    "storage_bucket": "fortunareader-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:246209323355:android:2ffb448305ce5030053a7e",
+        "android_client_info": {
+          "package_name": "com.lunaria.fortunareader"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVsi_XE3sGH3o8YsIuuKEUoPRaaniIAfQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
