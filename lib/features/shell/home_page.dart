@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'app_routes.dart';
+import '../../core/audio/bgm_service.dart'; // ★ これを追加
 
 const _sand = Color(0xFFEADCC2);
 const _night1 = Color(0xFF140F25);
@@ -39,6 +40,7 @@ class HomePage extends StatelessWidget {
                 children: [
                   const _TitlePlate(text: '占い館'),
                   const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   Expanded(
                     child: GridView.count(
                       crossAxisCount: 2,
@@ -68,7 +70,7 @@ class HomePage extends StatelessWidget {
                           imagePath: 'assets/images/omikuji.png',
                           title: 'おみくじ',
                           subtitle: '今日のひと言',
-                          route: AppRoutes.settings, // 仮
+                          route: AppRoutes.omikuji,
                         ),
                       ],
                     ),
