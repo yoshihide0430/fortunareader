@@ -1,11 +1,10 @@
-// lib/features/omikuji/omikuji_box_page.dart
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:just_audio/just_audio.dart';
+
 import 'omikuji_models.dart';
 import 'omikuji_ticket_page.dart';
-import 'dart:ui' as ui;
+import '../../core/audio/sfx_service.dart';
 
 class OmikujiBoxPage extends StatefulWidget {
   const OmikujiBoxPage({super.key});
@@ -15,329 +14,264 @@ class OmikujiBoxPage extends StatefulWidget {
 
 class _OmikujiBoxPageState extends State<OmikujiBoxPage>
     with TickerProviderStateMixin {
-  late final AnimationController _shakeCtrl; // 箱の揺れ（ばね）
-  late final AnimationController _stickCtrl; // 棒の突出（下から）
-  late final AnimationController _wobbleCtrl; // 棒先の減衰プルプル
-  final _sfxShake = AudioPlayer();
-  final _sfxStick = AudioPlayer();
-  bool _running = false;
+  late final AnimationController _shakeCtrl;
+  late final Animation<double> _shakeAnim;
+
+  late final AnimationController _stickCtrl;
+  late final Animation<double> _stickSlide;
+
+  bool _isAnimating = false;
+  bool _stickVisible = false;
+  int? _currentNumber;
+
+  // 箱（グループ全体）の見た目角度
+  static const double _tiltDeg = 115;
+  double get _tiltRad => _tiltDeg * pi / 180;
 
   @override
   void initState() {
     super.initState();
+
+    // 箱を振る
     _shakeCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _stickCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 520),
-    );
-    _wobbleCtrl = AnimationController(
-      vsync: this,
       duration: const Duration(milliseconds: 900),
+      vsync: this,
     );
-    // SFX（存在しなければ無音のまま）
-    _sfxShake.setAsset('assets/audio/sfx_shake.mp3').catchError((_) {});
-    _sfxStick.setAsset('assets/audio/sfx_stick.mp3').catchError((_) {});
+    _shakeAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.12), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.12, end: -0.12), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -0.12, end: 0.08), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: 0.08, end: -0.06), weight: 1),
+      TweenSequenceItem(tween: Tween(begin: -0.06, end: 0.00), weight: 1),
+    ]).animate(CurvedAnimation(parent: _shakeCtrl, curve: Curves.easeInOut));
+
+    // 棒のスライド（右下にズレつつ伸びる）
+    _stickCtrl = AnimationController(
+      duration: const Duration(milliseconds: 900),
+      vsync: this,
+    );
+    _stickSlide = CurvedAnimation(
+      parent: _stickCtrl,
+      curve: Curves.easeOutBack,
+    );
+
+    _stickCtrl.addListener(() => setState(() {})); // 棒の再描画
+
+    _shakeCtrl.addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        setState(() => _stickVisible = true);
+        SfxService().playStick();
+        _stickCtrl.forward(from: 0);
+      }
+    });
+
+    _stickCtrl.addStatusListener((s) {
+      if (s == AnimationStatus.completed) {
+        Future.delayed(const Duration(milliseconds: 380), _showResult);
+      }
+    });
   }
 
   @override
   void dispose() {
     _shakeCtrl.dispose();
     _stickCtrl.dispose();
-    _wobbleCtrl.dispose();
-    _sfxShake.dispose();
-    _sfxStick.dispose();
     super.dispose();
   }
 
-  Future<void> _draw() async {
-    if (_running) return;
-    _running = true;
-    try {
-      HapticFeedback.lightImpact();
-      _sfxShake.seek(Duration.zero).catchError((_) {});
-      _sfxShake.play().catchError((_) {});
+  Future<void> _drawOmikuji() async {
+    if (_isAnimating) return;
 
-      // ばね的に揺らす
-      await _shakeCtrl.animateTo(1.0, curve: Curves.elasticOut);
-      // 棒が下からニュッ
-      await _stickCtrl.forward(from: 0.0);
+    final number = Random().nextInt(500) + 1; // 1..500
 
-      HapticFeedback.mediumImpact();
-      _sfxStick.seek(Duration.zero).catchError((_) {});
-      _sfxStick.play().catchError((_) {});
-      _wobbleCtrl.forward(from: 0.0);
+    HapticFeedback.lightImpact();
+    SfxService().playShake();
+    setState(() {
+      _isAnimating = true;
+      _stickVisible = false;
+      _currentNumber = number;
+    });
 
-      // 番号を 1..500 で決定
-      final number = Random().nextInt(500) + 1;
+    _shakeCtrl.forward(from: 0);
+  }
 
-      // 結果を取得（番号→id対応）
-      final repo = OmikujiRepository();
-      final fortune = await repo.getByNumber(number);
+  Future<void> _showResult() async {
+    if (!mounted || _currentNumber == null) return;
+    final repo = OmikujiRepository();
+    final fortune = await repo.getByNumber(_currentNumber!);
 
-      if (!mounted) return;
-      await Navigator.of(context).push(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 260),
-          pageBuilder: (_, __, ___) =>
-              OmikujiTicketPage(result: fortune, stickNumber: number),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-        ),
-      );
+    if (!mounted) return;
+    SfxService().playPaper();
+    await Navigator.of(context).push(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 240),
+        pageBuilder: (_, __, ___) =>
+            OmikujiTicketPage(result: fortune, stickNumber: _currentNumber!),
+        transitionsBuilder: (_, a, __, child) =>
+            FadeTransition(opacity: a, child: child),
+      ),
+    );
 
-      // 戻ってきたらリセット
-      _stickCtrl.value = 0;
-      _wobbleCtrl.value = 0;
-      _shakeCtrl.value = 0;
-    } finally {
-      _running = false;
-    }
+    if (!mounted) return;
+    setState(() {
+      _isAnimating = false;
+      _stickVisible = false;
+      _currentNumber = null;
+    });
+    _shakeCtrl.reset();
+    _stickCtrl.reset();
   }
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    // ===== キャンバスと画像サイズ =====
+    const double groupW = 320;
+    const double groupH = 360;
+    const double boxW = 220;
+    const double boxH = 260;
 
-    final shake = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 0.0,
-          end: 1.0,
-        ).chain(CurveTween(curve: Curves.easeOut)),
-        weight: 30,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(
-          begin: 1.0,
-          end: 0.0,
-        ).chain(CurveTween(curve: Curves.bounceOut)),
-        weight: 70,
-      ),
-    ]).animate(_shakeCtrl);
+    // ===== 箱画像内の穴の相対位置（0〜1） =====
+    const double holeRelX = 0.53; // 右寄り
+    const double holeRelY = 0.24; // 下寄り
 
-    final stickOut = CurvedAnimation(
-      parent: _stickCtrl,
-      curve: Curves.easeOutCubic,
-    );
-    final wobble = _wobbleCtrl.drive(Tween<double>(begin: 0, end: 1));
-    double wobbleAngle() {
-      final t = wobble.value;
-      const amp = 0.06, lambda = 3.0, omega = 14.0;
-      return amp * exp(-lambda * t) * sin(omega * t);
+    // ===== 棒サイズ =====
+    const double stickLen = 180;
+    const double stickW = 60;
+
+    // ===== 右下へのスライド量（“振った後に右下へ”） =====
+    const double slideDx = 30; // →
+    const double slideDy = -50; // ↓
+
+    // さらに“気持ち下げる”微調整
+    const double extraDown = 30; // ← ここで下方向にオフセット
+
+    // ===== 穴中心の基準座標（グループ内px） =====
+    final baseLeft = (groupW - boxW) / 2 + boxW * holeRelX;
+    final baseTop = (groupH - boxH) / 2 + boxH * holeRelY;
+
+    Widget group() {
+      return SizedBox(
+        width: groupW,
+        height: groupH,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            // 箱（タップ/フリックで引く）
+            AnimatedBuilder(
+              animation: _shakeAnim,
+              builder: (_, __) => Transform.rotate(
+                angle: _shakeAnim.value,
+                child: GestureDetector(
+                  onTap: _drawOmikuji,
+                  onVerticalDragEnd: (_) => _drawOmikuji(),
+                  child: Image.asset(
+                    'assets/images/omikuji_box.png',
+                    width: boxW,
+                    height: boxH,
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+
+            // 棒：右下にズレつつ、上→下に“伸びて見える”（マスク使用）
+            if (_stickVisible)
+              AnimatedBuilder(
+                animation: _stickCtrl,
+                builder: (_, __) {
+                  final v = _stickSlide.value.clamp(0.0, 1.0);
+                  // ❶ ゆっくり見せる（体感を遅く）：最後に向かって加速する代わりに全体を少し間延び
+                  final slowV = Curves.easeOutCubic.transform(
+                    v * 0.75,
+                  ); // 0.75で全体を少しゆっくり
+
+                  // ❷ “見えるのは半分だけ” に制限（0〜0.5）
+                  const maxReveal = 0.5;
+                  final revealV = (slowV * maxReveal).clamp(0.001, maxReveal);
+
+                  // 座標：スライドは全体の進行 slowV に、棒の“伸び量/マスク”は revealV に
+                  final left = baseLeft - (stickW / 2) + slideDx * slowV;
+                  final top =
+                      baseTop -
+                      (stickLen * revealV) +
+                      slideDy * slowV +
+                      extraDown;
+
+                  return Positioned(
+                    left: left,
+                    top: top,
+                    child: Opacity(
+                      opacity: slowV, // 透明度もゆっくり
+                      child: Transform.rotate(
+                        angle: 0.0, // 必要なら回転を入れる（例: 0.12）
+                        child: ClipRect(
+                          child: Align(
+                            alignment: Alignment.topCenter,
+                            heightFactor: revealV, // ← “上→下に半分だけ”見せる
+                            child: SizedBox(
+                              width: stickW,
+                              height: stickLen,
+                              child: const _StickImage(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      );
     }
 
     return Scaffold(
       appBar: AppBar(title: const Text('おみくじ')),
-      body: GestureDetector(
-        onVerticalDragEnd: (_) => _draw(),
-        onTap: _draw,
-        child: Center(
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_shakeCtrl, _stickCtrl, _wobbleCtrl]),
-            builder: (context, _) {
-              final dx = sin(shake.value * pi * 6) * 10;
-              final out = stickOut.value;
-              return Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Transform.translate(
-                    offset: Offset(dx, 0),
-                    child: _BoxWidget(
-                      width: 260,
-                      height: 200,
-                      body: scheme.surface.withOpacity(0.96),
-                      edge: scheme.primary,
-                    ),
-                  ),
-                  // 棒：下から出す（bottom を動かす）
-                  Positioned(
-                    bottom: -170 + 170 * (1 - out),
-                    left: 130 - 12,
-                    child: Transform.rotate(
-                      angle: wobbleAngle(),
-                      alignment: Alignment.topCenter,
-                      child: _StickWidget(
-                        width: 24,
-                        height: 170,
-                        numberLabel: '第000番', // 表示はダミー（棒自体の見た目用）
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: -8,
-                    left: 0,
-                    right: 0,
-                    child: Text(
-                      '箱をタップ/上下フリックで引く',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+      body: Center(
+        child: Transform.rotate(
+          angle: _tiltRad, // 箱＋棒を下向きに見せる
+          child: group(),
+        ),
+      ),
+    );
+  }
+}
+
+/// 棒（番号表示なし）
+class _StickImage extends StatelessWidget {
+  const _StickImage();
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Image.asset(
+          'assets/images/omikuji_stick.png',
+          fit: BoxFit.fill,
+          errorBuilder: (_, __, ___) {
+            // 画像がない場合のフォールバック描画
+            return Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(8),
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Color(0xFFE6B78E), Color(0xFFB27B53)],
+                ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black38,
+                    blurRadius: 6,
+                    offset: Offset(1, 4),
                   ),
                 ],
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
-      ),
-    );
-  }
-}
-
-/// 正八角形風・木目陰影・下スリット
-class _BoxWidget extends StatelessWidget {
-  const _BoxWidget({
-    required this.width,
-    required this.height,
-    required this.body,
-    required this.edge,
-  });
-  final double width, height;
-  final Color body, edge;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: Size(width, height),
-      painter: _BoxPainter(body, edge),
-    );
-  }
-}
-
-class _BoxPainter extends CustomPainter {
-  final Color c, edge;
-  _BoxPainter(this.c, this.edge);
-
-  Path _regularOctagon(Rect r) {
-    // 正八角形（各辺45°カット）
-    final s = r.shortestSide;
-    final cut = s * 0.15;
-    final p = Path();
-    p.moveTo(r.left + cut, r.top);
-    p.lineTo(r.right - cut, r.top);
-    p.lineTo(r.right, r.top + cut);
-    p.lineTo(r.right, r.bottom - cut);
-    p.lineTo(r.right - cut, r.bottom);
-    p.lineTo(r.left + cut, r.bottom);
-    p.lineTo(r.left, r.bottom - cut);
-    p.lineTo(r.left, r.top + cut);
-    p.close();
-    return p;
-  }
-
-  @override
-  void paint(Canvas canvas, Size s) {
-    final w = s.width, h = s.height;
-
-    // 天面（八角形）をやや奥にパース
-    final topRect = Rect.fromLTWH(w * 0.10, h * 0.02, w * 0.80, h * 0.32);
-    final top = _regularOctagon(topRect);
-    final topPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [c.withOpacity(0.98), c.withOpacity(0.78)],
-      ).createShader(topRect);
-    final stroke = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..color = edge;
-
-    // 側面ボディ（八角面の下に矩形＋丸Rで近似、影を強めに）
-    final bodyRRect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w * 0.14, h * 0.22, w * 0.72, h * 0.56),
-      const Radius.circular(18),
-    );
-    final bodyPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [c.withOpacity(0.95), c.withOpacity(0.72)],
-      ).createShader(bodyRRect.outerRect);
-
-    // 描画順：側面 → 天面（境界が乗る）→ ハイライト
-    canvas.drawRRect(bodyRRect, bodyPaint);
-    canvas.drawRRect(bodyRRect, stroke);
-
-    canvas.drawPath(top, topPaint);
-    canvas.drawPath(top, stroke);
-
-    // 天面のハイライト（木目の照り返しを疑似）
-    final topHL = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [Colors.white.withOpacity(0.10), Colors.transparent],
-      ).createShader(topRect);
-    canvas.drawPath(top, topHL);
-
-    // 下スリット（金縁）
-    final slot = RRect.fromRectAndRadius(
-      Rect.fromLTWH(w * 0.42, h * 0.74, w * 0.16, h * 0.06),
-      const Radius.circular(6),
-    );
-    canvas.drawRRect(slot, Paint()..color = Colors.black.withOpacity(0.78));
-    canvas.drawRRect(
-      slot,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = const Color(0xFFD4AF37),
-    );
-
-    // 影（箱の落ち影）
-    final shadow = Paint()
-      ..shader = ui.Gradient.radial(Offset(w * 0.50, h * 0.92), w * 0.40, [
-        Colors.black26,
-        Colors.transparent,
-      ]);
-    canvas.drawCircle(Offset(w * 0.50, h * 0.92), w * 0.40, shadow);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// 木の棒（焼印っぽい見栄え）
-class _StickWidget extends StatelessWidget {
-  const _StickWidget({
-    required this.width,
-    required this.height,
-    required this.numberLabel,
-  });
-  final double width, height;
-  final String numberLabel;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(7),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF82503C), Color(0xFFBF835A)],
-        ),
-        boxShadow: const [
-          BoxShadow(color: Colors.black38, blurRadius: 6, offset: Offset(1, 4)),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: RotatedBox(
-        quarterTurns: 1,
-        child: Text(
-          numberLabel,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: const Color(0xFF2A1A14),
-            fontWeight: FontWeight.w900,
-            letterSpacing: 2,
-          ),
-        ),
-      ),
+      ],
     );
   }
 }

@@ -29,8 +29,13 @@ flutter:
     - assets/omikuji/fortunes.json
     # 🎵 BGMファイル
     - assets/audio/n59.mp3
-    - assets/audio/sfx_shake.mp3      # 箱を振る
-    - assets/audio/sfx_stick.mp3      # 棒が当たる
+    # 画像
+    - assets/images/omikuji_box.png      # ← この会話で提示の箱PNGを配置
+    - assets/images/omikuji_stick.png    # ← 任意。無ければ自動でフォールバック描画
+    # 効果音
+    - assets/audio/shake.mp3
+    - assets/audio/stick.mp3
+    - assets/audio/paper.mp3
 
     # 🖼️ 画像類
     - assets/images/palm.png

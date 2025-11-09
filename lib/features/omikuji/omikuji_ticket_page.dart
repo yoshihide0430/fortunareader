@@ -43,7 +43,7 @@ class OmikujiTicketPage extends StatelessWidget {
                 left: leftPad,
                 right: rightPad,
                 top: topPad,
-                bottom: 0,
+                bottom: topPad,
                 child: SingleChildScrollView(
                   padding: EdgeInsets.only(
                     bottom: safeBottom + 120, // ← 一番下が隠れないように余裕を確保
