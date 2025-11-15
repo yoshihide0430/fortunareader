@@ -26,23 +26,36 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/omikuji/fortunes.json
-    # 🎵 BGMファイル
-    - assets/audio/n59.mp3
-    # 画像
-    - assets/images/omikuji_box.png      # ← この会話で提示の箱PNGを配置
-    - assets/images/omikuji_stick.png    # ← 任意。無ければ自動でフォールバック描画
-    # 効果音
-    - assets/audio/shake.mp3
-    - assets/audio/stick.mp3
-    - assets/audio/paper.mp3
+    # 🔮 星座占いデータ（12セット×180件）
+    # Homeの「星座占い」機能で使うJSON
+    - assets/zodiac/zodiac_sets.json
 
-    # 🖼️ 画像類
-    - assets/images/palm.png
-    - assets/images/zodiac.png
-    - assets/images/daily.png
-    - assets/images/omikuji.png
+    # 🧧 おみくじ結果データ
+    # OmikujiBox → 結果画面で読み込む予定のJSON
+    # まだ中身未完成なら、ファイルだけ空で置いておく or 一旦この行をコメントアウトでもOK
+    - assets/omikuji/fortunes.json
+
+    # 🎵 BGM（アプリ全体で流すループBGM）
+    - assets/audio/n59.mp3
+
+    # 📦 おみくじ箱＆棒の画像（おみくじ画面用）
+    - assets/images/omikuji_box.png     # 箱本体
+    - assets/images/omikuji_stick.png   # 引き抜く棒の画像
+
+    # 🔊 効果音（おみくじ演出用）
+    - assets/audio/shake.mp3  # 振るとき
+    - assets/audio/stick.mp3  # 棒が出るとき
+    - assets/audio/paper.mp3  # 紙が開くとき
+
+    # 🏠 ホーム画面アイコン（4つのカード）
+    - assets/images/palm.png      # 手相
+    - assets/images/zodiac.png    # 星座占い
+    - assets/images/daily.png     # 今日の運勢
+    - assets/images/omikuji.png   # おみくじ
+
+    # 🎴 おみくじ結果背景（和紙っぽい背景）
     - assets/images/omikuji_bg.png
+
 
   # フォントを追加する場合はここに追記
   # fonts:
