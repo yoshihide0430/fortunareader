@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'features/shell/app_routes.dart';
 import 'features/shell/home_page.dart';
+import 'features/seimon/seimon_debug_page.dart';
 
 // ★ 追加：BGMサービス（just_audioベースのシングルトン想定）
 import 'core/audio/bgm_service.dart';

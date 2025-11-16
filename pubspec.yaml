@@ -16,6 +16,7 @@ dependencies:
   audio_session: ^0.1.19
   firebase_core: ^4.2.1
   cupertino_icons: ^1.0.8
+  image_picker: ^1.1.1  
 
 dev_dependencies:
   flutter_test:
@@ -26,6 +27,8 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/seimon/seimon_types.json
+    - assets/seimon/seimon_variants.json
     # 🔮 星座占いデータ（12セット×180件）
     # Homeの「星座占い」機能で使うJSON
     - assets/zodiac/zodiac_sets.json

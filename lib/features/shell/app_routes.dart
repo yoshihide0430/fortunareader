@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dummy_pages.dart';
 import '../omikuji/omikuji_box_page.dart';
 import '../zodiac/zodiac_select_page.dart';
+import '../seimon/seimon_input_page.dart';
+import '../palm/palm_capture_page.dart'; // ★ 追加
 
 class AppRoutes {
   static const palm = '/palm';
@@ -11,9 +13,9 @@ class AppRoutes {
   static const omikuji = '/omikuji';
 
   static Map<String, WidgetBuilder> routes = {
-    palm: (_) => const DummyPage(title: '手相（撮影へ）'),
+    palm: (_) => const PalmCapturePage(),
     zodiac: (_) => const ZodiacSelectPage(),
-    numerology: (_) => const DummyPage(title: '今日の運勢（準備中）'),
+    numerology: (_) => const SeimonInputPage(),
     omikuji: (_) => const OmikujiBoxPage(),
   };
 }

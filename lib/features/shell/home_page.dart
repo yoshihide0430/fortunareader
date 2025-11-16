@@ -62,8 +62,8 @@ class HomePage extends StatelessWidget {
                         ),
                         _FeatureCard(
                           imagePath: 'assets/images/daily.png',
-                          title: '今日の運勢',
-                          subtitle: 'デイリーフォーチュン',
+                          title: '姓名判断',
+                          subtitle: '名前と生年月日から',
                           route: AppRoutes.numerology, // 仮
                         ),
                         _FeatureCard(
